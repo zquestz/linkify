@@ -658,6 +658,26 @@ fn ipv6_invalid_not_linked() {
 }
 
 #[test]
+fn at_prefix() {
+    // Issue #93: @ prefix should not block URL detection
+    // These should work - @ is not preceded by valid email local-part chars
+    assert_linked("@https://example.org", "@|https://example.org|");
+    assert_linked(" @https://example.org", " @|https://example.org|");
+    assert_linked("(@https://example.org)", "(@|https://example.org|)");
+    assert_linked(".@https://example.org", ".@|https://example.org|");
+    assert_linked("@@https://example.org", "@@|https://example.org|");
+    assert_linked(":@https://example.org", ":@|https://example.org|");
+    assert_linked("\n@https://example.org", "\n@|https://example.org|");
+    // These should NOT detect the URL - @ is preceded by valid email chars
+    // (would look like an email address otherwise)
+    assert_not_linked("foo@https://example.org");
+    assert_not_linked("a@https://example.org");
+    assert_not_linked("user123@https://example.org");
+    // International chars before @ should also block (valid email local-part)
+    assert_not_linked("über@https://example.org");
+}
+
+#[test]
 fn exclamation_mark_in_path() {
     // Issue #90: exclamation mark followed by slash should be kept
     assert_linked("https://lychee.cli.rs/!/", "|https://lychee.cli.rs/!/|");
