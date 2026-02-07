@@ -658,6 +658,39 @@ fn ipv6_invalid_not_linked() {
 }
 
 #[test]
+fn exclamation_mark_in_path() {
+    // Issue #90: exclamation mark followed by slash should be kept
+    assert_linked("https://lychee.cli.rs/!/", "|https://lychee.cli.rs/!/|");
+    assert_linked(
+        "https://lychee.cli.rs/test!/",
+        "|https://lychee.cli.rs/test!/|",
+    );
+    assert_linked(
+        "https://lychee.cli.rs/!/ and https://lychee.cli.rs/test!/",
+        "|https://lychee.cli.rs/!/| and |https://lychee.cli.rs/test!/|",
+    );
+    // Exclamation mark NOT followed by slash should still be trimmed
+    assert_linked(
+        "Check out https://example.com!",
+        "Check out |https://example.com|!",
+    );
+    assert_linked("https://example.com/path!", "|https://example.com/path|!");
+    // Exclamation mark followed by space should be trimmed
+    assert_linked(
+        "https://example.com/path! more text",
+        "|https://example.com/path|! more text",
+    );
+    // Multiple exclamation marks before slash
+    assert_linked(
+        "https://example.com/test!!/",
+        "|https://example.com/test!!/|",
+    );
+    // Scheme-less URLs with exclamation mark
+    assert_urls_without_protocol("example.com/!/", "|example.com/!/|");
+    assert_urls_without_protocol("example.com/test!/", "|example.com/test!/|");
+}
+
+#[test]
 fn non_breaking_space() {
     // Issue #66: non-breaking space should not be included in URLs
     // NBSP in path should stop the URL
@@ -698,28 +731,16 @@ fn non_breaking_space() {
 #[test]
 fn non_breaking_space_without_protocol() {
     // NBSP should also work correctly for URLs without protocol
-    assert_urls_without_protocol(
-        "example.com\u{a0}test.com",
-        "|example.com|\u{a0}|test.com|",
-    );
-    assert_urls_without_protocol(
-        "\u{a0}example.com",
-        "\u{a0}|example.com|",
-    );
+    assert_urls_without_protocol("example.com\u{a0}test.com", "|example.com|\u{a0}|test.com|");
+    assert_urls_without_protocol("\u{a0}example.com", "\u{a0}|example.com|");
     // Percent-encoded space should still work
-    assert_urls_without_protocol(
-        "example.com/path%20file",
-        "|example.com/path%20file|",
-    );
+    assert_urls_without_protocol("example.com/path%20file", "|example.com/path%20file|");
 }
 
 #[test]
 fn non_breaking_space_edge_cases() {
     // NBSP at very start of input
-    assert_linked(
-        "\u{a0}https://example.com",
-        "\u{a0}|https://example.com|",
-    );
+    assert_linked("\u{a0}https://example.com", "\u{a0}|https://example.com|");
     // NBSP in query string
     assert_linked(
         "https://example.com/path?q=hello\u{a0}world",
@@ -748,10 +769,7 @@ fn non_breaking_space_edge_cases() {
     // NBSP right after scheme (before authority)
     assert_not_linked("https://\u{a0}example.com");
     // International domain followed by NBSP
-    assert_linked(
-        "https://café\u{a0}.com",
-        "|https://café|\u{a0}.com",
-    );
+    assert_linked("https://café\u{a0}.com", "|https://café|\u{a0}.com");
 }
 
 #[test]

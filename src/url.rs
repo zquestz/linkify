@@ -227,11 +227,16 @@ fn find_url_end(s: &str, quote: Option<char>, iri_parsing_enabled: bool) -> Opti
                 // below, we require the braces to be balanced.
                 break;
             }
-            '?' | '!' | '.' | ',' | ':' | ';' | '*' => {
+            '?' | '.' | ',' | ':' | ';' | '*' => {
                 // These may be part of an URL but not at the end. It's not that the spec
                 // doesn't allow them, but they are frequently used in plain text as delimiters
                 // where they're not meant to be part of the URL.
                 false
+            }
+            '!' => {
+                // Exclamation mark followed by '/' is part of the URL path (issue #90)
+                // Otherwise, treat as potential punctuation (can't be last)
+                s[i..].starts_with("!/")
             }
             '/' => {
                 // This may be part of an URL and at the end, but not if the previous character
