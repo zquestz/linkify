@@ -89,7 +89,9 @@ impl EmailScanner {
             | '|'
             | '}'
             | '~' => true,
-            _ => c >= '\u{80}',
+            // Allow international characters (RFC 6531) but exclude Unicode whitespace
+            // (e.g., NBSP, EM SPACE, IDEOGRAPHIC SPACE) which should act as word boundaries
+            _ => c >= '\u{80}' && !c.is_whitespace(),
         }
     }
 }
