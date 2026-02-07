@@ -538,6 +538,125 @@ fn assert_not_linked(s: &str) {
     assert_linked(s, s);
 }
 
+// =====================================================================
+// IPv6 URLs (RFC 2732)
+// =====================================================================
+
+#[test]
+fn ipv6_basic() {
+    assert_linked("http://[::1]/", "|http://[::1]/|");
+    assert_linked("http://[::1]", "|http://[::1]|");
+    assert_linked("https://[::1]/", "|https://[::1]/|");
+    assert_linked("https://[::1]", "|https://[::1]|");
+}
+
+#[test]
+fn ipv6_with_port() {
+    assert_linked("http://[::1]:8080/", "|http://[::1]:8080/|");
+    assert_linked("http://[::1]:8080", "|http://[::1]:8080|");
+    assert_linked("https://[::1]:443/path", "|https://[::1]:443/path|");
+}
+
+#[test]
+fn ipv6_full_address() {
+    assert_linked(
+        "http://[2001:db8:85a3::8a2e:370:7334]/",
+        "|http://[2001:db8:85a3::8a2e:370:7334]/|",
+    );
+    assert_linked(
+        "http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html",
+        "|http://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]:80/index.html|",
+    );
+    assert_linked(
+        "http://[1080:0:0:0:8:800:200C:417A]/index.html",
+        "|http://[1080:0:0:0:8:800:200C:417A]/index.html|",
+    );
+    assert_linked(
+        "http://[3ffe:2a00:100:7031::1]",
+        "|http://[3ffe:2a00:100:7031::1]|",
+    );
+}
+
+#[test]
+fn ipv6_loopback_and_unspecified() {
+    assert_linked("http://[::1]/path", "|http://[::1]/path|");
+    assert_linked("http://[::]/path", "|http://[::]/path|");
+    assert_linked("http://[0:0:0:0:0:0:0:1]/", "|http://[0:0:0:0:0:0:0:1]/|");
+}
+
+#[test]
+fn ipv6_mapped_ipv4() {
+    // IPv4-mapped IPv6 addresses
+    assert_linked("http://[::ffff:192.0.2.1]/", "|http://[::ffff:192.0.2.1]/|");
+    assert_linked(
+        "http://[::FFFF:129.144.52.38]:80/index.html",
+        "|http://[::FFFF:129.144.52.38]:80/index.html|",
+    );
+    assert_linked("http://[::192.9.5.5]/ipng", "|http://[::192.9.5.5]/ipng|");
+}
+
+#[test]
+fn ipv6_with_path_and_query() {
+    assert_linked(
+        "http://[::1]/path/to/resource",
+        "|http://[::1]/path/to/resource|",
+    );
+    assert_linked(
+        "http://[::1]:8080/path?query=value",
+        "|http://[::1]:8080/path?query=value|",
+    );
+    assert_linked(
+        "http://[2001:db8::1]/path?foo=bar&baz=qux",
+        "|http://[2001:db8::1]/path?foo=bar&baz=qux|",
+    );
+}
+
+#[test]
+fn ipv6_in_text() {
+    assert_linked(
+        "Check out http://[::1]:8080/test for more info",
+        "Check out |http://[::1]:8080/test| for more info",
+    );
+    assert_linked(
+        "Visit http://[2001:db8::1]/ today!",
+        "Visit |http://[2001:db8::1]/| today!",
+    );
+}
+
+#[test]
+fn ipv6_various_schemes() {
+    assert_linked("ftp://[::1]/file.txt", "|ftp://[::1]/file.txt|");
+    assert_linked("ssh://[::1]/", "|ssh://[::1]/|");
+    // Custom schemes should also work
+    assert_linked("custom://[::1]/path", "|custom://[::1]/path|");
+    assert_linked(
+        "myapp://[::1]:7500/files/test",
+        "|myapp://[::1]:7500/files/test|",
+    );
+}
+
+#[test]
+fn ipv6_yggdrasil_addresses() {
+    // Yggdrasil mesh network addresses (0200::/7)
+    assert_linked(
+        "http://[200:abcd:1234:5678:90ab:cdef:1234:5678]/",
+        "|http://[200:abcd:1234:5678:90ab:cdef:1234:5678]/|",
+    );
+    assert_linked(
+        "http://[202:e7f:a50e:d03b:e13e:75f1:24c9:58bc]/files/Music",
+        "|http://[202:e7f:a50e:d03b:e13e:75f1:24c9:58bc]/files/Music|",
+    );
+}
+
+#[test]
+fn ipv6_invalid_not_linked() {
+    // Unclosed bracket
+    assert_not_linked("http://[::1/path");
+    // Invalid characters inside brackets
+    assert_not_linked("http://[::g1]/");
+    assert_not_linked("http://[::1@host]/");
+}
+
 /// Assert link with protocol
 fn assert_linked(input: &str, expected: &str) {
     let finder = LinkFinder::new();
