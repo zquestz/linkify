@@ -657,6 +657,175 @@ fn ipv6_invalid_not_linked() {
     assert_not_linked("http://[::1@host]/");
 }
 
+#[test]
+fn non_breaking_space() {
+    // Issue #66: non-breaking space should not be included in URLs
+    // NBSP in path should stop the URL
+    assert_linked(
+        "https://example.com/path\u{a0}more",
+        "|https://example.com/path|\u{a0}more",
+    );
+    // NBSP between URLs should separate them
+    assert_linked(
+        "https://a.com\u{a0}https://b.com",
+        "|https://a.com|\u{a0}|https://b.com|",
+    );
+    // NBSP in domain should stop the URL
+    assert_linked(
+        "https://example\u{a0}.com/path",
+        "|https://example|\u{a0}.com/path",
+    );
+    // Percent-encoded space (%20) should still be included in URLs
+    assert_linked(
+        "https://example.com/path%20with%20spaces",
+        "|https://example.com/path%20with%20spaces|",
+    );
+    assert_linked(
+        "https://example.com/my%20folder/file.txt",
+        "|https://example.com/my%20folder/file.txt|",
+    );
+    // Other Unicode whitespace should also stop URLs (EM SPACE, IDEOGRAPHIC SPACE)
+    assert_linked(
+        "https://example.com/path\u{2003}more",
+        "|https://example.com/path|\u{2003}more",
+    );
+    assert_linked(
+        "https://example.com/path\u{3000}more",
+        "|https://example.com/path|\u{3000}more",
+    );
+}
+
+#[test]
+fn non_breaking_space_without_protocol() {
+    // NBSP should also work correctly for URLs without protocol
+    assert_urls_without_protocol(
+        "example.com\u{a0}test.com",
+        "|example.com|\u{a0}|test.com|",
+    );
+    assert_urls_without_protocol(
+        "\u{a0}example.com",
+        "\u{a0}|example.com|",
+    );
+    // Percent-encoded space should still work
+    assert_urls_without_protocol(
+        "example.com/path%20file",
+        "|example.com/path%20file|",
+    );
+}
+
+#[test]
+fn non_breaking_space_edge_cases() {
+    // NBSP at very start of input
+    assert_linked(
+        "\u{a0}https://example.com",
+        "\u{a0}|https://example.com|",
+    );
+    // NBSP in query string
+    assert_linked(
+        "https://example.com/path?q=hello\u{a0}world",
+        "|https://example.com/path?q=hello|\u{a0}world",
+    );
+    // NBSP in fragment
+    assert_linked(
+        "https://example.com/path#section\u{a0}more",
+        "|https://example.com/path#section|\u{a0}more",
+    );
+    // Multiple consecutive NBSPs
+    assert_linked(
+        "https://a.com\u{a0}\u{a0}https://b.com",
+        "|https://a.com|\u{a0}\u{a0}|https://b.com|",
+    );
+    // NBSP in userinfo (before @) - note: "name@example.com" is correctly found as email
+    assert_linked(
+        "https://user\u{a0}name@example.com",
+        "|https://user|\u{a0}|name@example.com|",
+    );
+    // NBSP in port number
+    assert_linked(
+        "https://example.com:80\u{a0}90/path",
+        "|https://example.com:80|\u{a0}90/path",
+    );
+    // NBSP right after scheme (before authority)
+    assert_not_linked("https://\u{a0}example.com");
+    // International domain followed by NBSP
+    assert_linked(
+        "https://café\u{a0}.com",
+        "|https://café|\u{a0}.com",
+    );
+}
+
+#[test]
+fn other_unicode_whitespace() {
+    // U+202F NARROW NO-BREAK SPACE (common in French typography)
+    assert_linked(
+        "https://example.com/path\u{202f}more",
+        "|https://example.com/path|\u{202f}more",
+    );
+    // U+2028 LINE SEPARATOR
+    assert_linked(
+        "https://example.com/path\u{2028}more",
+        "|https://example.com/path|\u{2028}more",
+    );
+    // U+2029 PARAGRAPH SEPARATOR
+    assert_linked(
+        "https://example.com/path\u{2029}more",
+        "|https://example.com/path|\u{2029}more",
+    );
+    // U+1680 OGHAM SPACE MARK
+    assert_linked(
+        "https://example.com/path\u{1680}more",
+        "|https://example.com/path|\u{1680}more",
+    );
+    // U+205F MEDIUM MATHEMATICAL SPACE
+    assert_linked(
+        "https://example.com/path\u{205f}more",
+        "|https://example.com/path|\u{205f}more",
+    );
+}
+
+#[test]
+fn unicode_whitespace_in_email_context() {
+    // URL followed by email separated by NBSP
+    let finder = LinkFinder::new();
+    assert_linked_with(
+        &finder,
+        "https://example.com\u{a0}user@example.com",
+        "|https://example.com|\u{a0}|user@example.com|",
+    );
+    // Email followed by URL separated by NBSP
+    assert_linked_with(
+        &finder,
+        "user@example.com\u{a0}https://example.com",
+        "|user@example.com|\u{a0}|https://example.com|",
+    );
+}
+
+#[test]
+fn non_breaking_space_iri_disabled() {
+    // NBSP should also work correctly when IRI parsing is disabled
+    let mut finder = LinkFinder::new();
+    finder.url_can_be_iri(false);
+
+    // NBSP in path
+    assert_linked_with(
+        &finder,
+        "https://example.com/path\u{a0}more",
+        "|https://example.com/path|\u{a0}more",
+    );
+    // NBSP between URLs
+    assert_linked_with(
+        &finder,
+        "https://a.com\u{a0}https://b.com",
+        "|https://a.com|\u{a0}|https://b.com|",
+    );
+    // NBSP in domain
+    assert_linked_with(
+        &finder,
+        "https://example\u{a0}.com/path",
+        "|https://example|\u{a0}.com/path",
+    );
+}
+
 /// Assert link with protocol
 fn assert_linked(input: &str, expected: &str) {
     let finder = LinkFinder::new();

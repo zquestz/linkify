@@ -54,8 +54,26 @@ pub(crate) fn find_authority_end(
     for (i, c) in s.char_indices() {
         let can_be_last = match c {
             // ALPHA
-            'a'..='z' | 'A'..='Z' | '\u{80}'..=char::MAX => {
-                if !iri_parsing_enabled && c > '\u{80}' {
+            'a'..='z' | 'A'..='Z' => {
+                // Can start or end a domain label, but not numeric
+                dot_allowed = true;
+                hyphen_allowed = true;
+                last_dot = maybe_last_dot;
+                all_numeric = false;
+
+                if host_ended {
+                    maybe_host = false;
+                }
+
+                !require_host || !host_ended
+            }
+            // International characters (IRI support)
+            '\u{80}'..=char::MAX => {
+                if !iri_parsing_enabled {
+                    break;
+                }
+                // Exclude Unicode whitespace (e.g., NBSP, EM SPACE, IDEOGRAPHIC SPACE)
+                if c.is_whitespace() {
                     break;
                 }
                 // Can start or end a domain label, but not numeric

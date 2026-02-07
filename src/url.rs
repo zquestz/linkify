@@ -162,7 +162,9 @@ fn find_domain_start(s: &str, iri_parsing_enabled: bool) -> (Option<usize>, Opti
     for (i, c) in s.char_indices().rev() {
         match c {
             'a'..='z' | 'A'..='Z' | '0'..='9' => first = Some(i),
-            '\u{80}'..=char::MAX if iri_parsing_enabled => first = Some(i),
+            // Allow international characters but exclude Unicode whitespace
+            // (e.g., NBSP, EM SPACE, IDEOGRAPHIC SPACE)
+            '\u{80}'..=char::MAX if iri_parsing_enabled && !c.is_whitespace() => first = Some(i),
             // If we had something valid like `https://www.` we'd have found it with the ":"
             // scanner already. We don't want to allow `.../www.example.com` just by itself.
             // We *could* allow `//www.example.com` (scheme-relative URLs) in the future.
@@ -281,6 +283,9 @@ fn find_url_end(s: &str, quote: Option<char>, iri_parsing_enabled: bool) -> Opti
                 // A single quote can only be the end of an URL if there's an even number
                 !single_quote
             }
+            // Exclude Unicode whitespace (e.g., NBSP, EM SPACE, IDEOGRAPHIC SPACE)
+            // Must come before IRI check so whitespace breaks regardless of IRI setting
+            _ if c.is_whitespace() => break,
             '\u{80}'..=char::MAX if !iri_parsing_enabled => false,
 
             _ => true,

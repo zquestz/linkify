@@ -123,6 +123,55 @@ fn fuzz() {
     assert_linked("a@a.xyϸ", "|a@a.xyϸ|");
 }
 
+#[test]
+fn non_breaking_space() {
+    // Issue #66: non-breaking space should not be included in email addresses
+    assert_linked(
+        "this is a mail address:\u{a0}test@example.com\u{a0}surrounded by non-breaking spaces",
+        "this is a mail address:\u{a0}|test@example.com|\u{a0}surrounded by non-breaking spaces",
+    );
+    assert_linked("\u{a0}a@b.com\u{a0}", "\u{a0}|a@b.com|\u{a0}");
+    assert_linked("a@b.com\u{a0}c@d.com", "|a@b.com|\u{a0}|c@d.com|");
+}
+
+#[test]
+fn other_unicode_whitespace() {
+    // U+202F NARROW NO-BREAK SPACE (common in French typography)
+    assert_linked("a@b.com\u{202f}c@d.com", "|a@b.com|\u{202f}|c@d.com|");
+    // U+2003 EM SPACE
+    assert_linked("a@b.com\u{2003}c@d.com", "|a@b.com|\u{2003}|c@d.com|");
+    // U+3000 IDEOGRAPHIC SPACE (CJK)
+    assert_linked("a@b.com\u{3000}c@d.com", "|a@b.com|\u{3000}|c@d.com|");
+    // U+2028 LINE SEPARATOR
+    assert_linked("a@b.com\u{2028}c@d.com", "|a@b.com|\u{2028}|c@d.com|");
+    // U+2029 PARAGRAPH SEPARATOR
+    assert_linked("a@b.com\u{2029}c@d.com", "|a@b.com|\u{2029}|c@d.com|");
+    // U+1680 OGHAM SPACE MARK
+    assert_linked("a@b.com\u{1680}c@d.com", "|a@b.com|\u{1680}|c@d.com|");
+    // U+205F MEDIUM MATHEMATICAL SPACE
+    assert_linked("a@b.com\u{205f}c@d.com", "|a@b.com|\u{205f}|c@d.com|");
+}
+
+#[test]
+fn unicode_whitespace_in_local_part() {
+    // NBSP before @ should not be included in local part
+    assert_linked("test\u{a0}@example.com", "test\u{a0}@example.com");
+    // International chars still work
+    assert_linked("tëst@example.com", "|tëst@example.com|");
+    // International char followed by NBSP
+    assert_linked("tëst\u{a0}@example.com", "tëst\u{a0}@example.com");
+}
+
+#[test]
+fn unicode_whitespace_in_domain() {
+    // NBSP in domain should stop the email
+    assert_linked("test@exam\u{a0}ple.com", "test@exam\u{a0}ple.com");
+    // International domain still works
+    assert_linked("test@exämple.com", "|test@exämple.com|");
+    // International domain followed by NBSP
+    assert_linked("test@exämple\u{a0}.com", "test@exämple\u{a0}.com");
+}
+
 fn assert_not_linked(s: &str) {
     let mut finder = LinkFinder::new();
     finder.kinds(&[LinkKind::Email]);
