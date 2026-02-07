@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use crate::chars::is_email_local_char;
 use crate::domains::find_authority_end;
 use crate::scanner::Scanner;
 
@@ -66,32 +67,6 @@ impl EmailScanner {
 
     // See "Atom" in RFC 5321, "atext" in RFC 5322
     fn local_atom_allowed(c: char) -> bool {
-        match c {
-            'a'..='z'
-            | 'A'..='Z'
-            | '0'..='9'
-            | '!'
-            | '#'
-            | '$'
-            | '%'
-            | '&'
-            | '\''
-            | '*'
-            | '+'
-            | '-'
-            | '/'
-            | '='
-            | '?'
-            | '^'
-            | '_'
-            | '`'
-            | '{'
-            | '|'
-            | '}'
-            | '~' => true,
-            // Allow international characters (RFC 6531) but exclude Unicode whitespace
-            // (e.g., NBSP, EM SPACE, IDEOGRAPHIC SPACE) which should act as word boundaries
-            _ => c >= '\u{80}' && !c.is_whitespace(),
-        }
+        is_email_local_char(c)
     }
 }

@@ -1,6 +1,7 @@
 use std::char;
 use std::ops::Range;
 
+use crate::chars::is_email_local_char;
 use crate::domains::find_authority_end;
 use crate::scanner::Scanner;
 
@@ -116,7 +117,18 @@ fn find_scheme_start(s: &str) -> (Option<usize>, Option<char>) {
             'a'..='z' | 'A'..='Z' => first = Some(i),
             '0'..='9' => special = Some(i),
             '+' | '-' | '.' => {}
-            '@' => return (None, None),
+            '@' => {
+                // Only reject if @ is preceded by a valid email local-part character.
+                // This prevents detecting URLs in email addresses like "user@https.com"
+                // but allows "@https://example.org" where @ is just a prefix.
+                if i > 0 {
+                    let prev_char = s[..i].chars().last().unwrap();
+                    if is_email_local_char(prev_char) {
+                        return (None, None);
+                    }
+                }
+                break;
+            }
             c if QUOTES.contains(&c) => {
                 // Check if there's a quote before the scheme,
                 // and stop once we encounter one of those quotes.
