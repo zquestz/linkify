@@ -34,6 +34,12 @@ pub(crate) fn find_authority_end(
     port_allowed: bool,
     iri_parsing_enabled: bool,
 ) -> (Option<usize>, Option<usize>) {
+    // Handle IPv6 literals: IP-literal = "[" ( IPv6address / IPvFuture ) "]"
+    // Per RFC 2732 and RFC 3986
+    if s.starts_with('[') {
+        return find_ipv6_authority_end(s, port_allowed);
+    }
+
     let mut end = Some(0);
 
     let mut maybe_last_dot = None;
@@ -207,4 +213,83 @@ fn valid_tld(tld: &str) -> bool {
         .take(2)
         .count()
         >= 2
+}
+
+/// Handle IPv6 literal addresses in the authority component.
+///
+/// Parses `[IPv6address]` optionally followed by `:port`.
+/// Returns (end_position, None) since IPv6 literals don't have a "last dot" for TLD checking.
+fn find_ipv6_authority_end(s: &str, port_allowed: bool) -> (Option<usize>, Option<usize>) {
+    debug_assert!(s.starts_with('['));
+
+    let mut end = 1; // Skip opening '['
+    let mut found_close = false;
+
+    // Scan for valid IPv6 characters until we find ']'
+    for (i, c) in s[1..].char_indices() {
+        match c {
+            // Valid IPv6 characters: hex digits, colons, dots (for IPv4-mapped addresses)
+            '0'..='9' | 'a'..='f' | 'A'..='F' | ':' | '.' => {
+                end = 1 + i + c.len_utf8();
+            }
+            ']' => {
+                end = 1 + i + 1; // Include the ']'
+                found_close = true;
+                break;
+            }
+            _ => {
+                // Invalid character in IPv6 literal
+                return (None, None);
+            }
+        }
+    }
+
+    if !found_close {
+        // No closing bracket found
+        return (None, None);
+    }
+
+    // Check what comes after the ']'
+    let rest = &s[end..];
+
+    if rest.is_empty() {
+        // Just the IPv6 address, no port or path
+        return (Some(end), None);
+    }
+
+    match rest.chars().next() {
+        Some(':') if port_allowed => {
+            // Parse port number
+            let port_start = end + 1;
+            let mut port_end = port_start;
+
+            for (i, c) in s[port_start..].char_indices() {
+                if c.is_ascii_digit() {
+                    port_end = port_start + i + 1;
+                } else {
+                    break;
+                }
+            }
+
+            if port_end > port_start {
+                // Valid port found
+                (Some(port_end), None)
+            } else {
+                // Colon but no port digits - still valid, authority ends at ']'
+                (Some(end), None)
+            }
+        }
+        Some('/') | Some('?') | Some('#') | None => {
+            // Path, query, fragment, or end of string - authority ends here
+            (Some(end), None)
+        }
+        Some(':') => {
+            // Port not allowed but found colon
+            (Some(end), None)
+        }
+        _ => {
+            // Invalid character after ']'
+            (Some(end), None)
+        }
+    }
 }
